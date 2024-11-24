@@ -1,14 +1,13 @@
-// index.js
-
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
 
-const serviceAccount = require('./conexion-agraria-firebase-adminsdk-ha2ts-793e939244.json');
+// Obtener las credenciales de Firebase desde la variable de entorno
+const firebaseCredentials = JSON.parse(process.env.FIREBASE_CREDENTIALS_JSON);
 
 // Inicializa Firebase Admin SDK
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert(firebaseCredentials),
   databaseURL: "https://conexion-agraria-default-rtdb.firebaseio.com",
   storageBucket: "conexion-agraria.appspot.com"
 });
