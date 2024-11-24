@@ -1,16 +1,30 @@
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
+const path = require('path');
 
-// Obtener las credenciales de Firebase desde la variable de entorno
-const firebaseCredentials = JSON.parse(process.env.FIREBASE_CREDENTIALS_JSON);
+// Inicialización de Firebase Admin SDK
+try {
+  let serviceAccount;
+  if (process.env.FIREBASE_CREDENTIALS) {
+    // Credenciales desde variables de entorno
+    serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
+  } else {
+    // Credenciales desde un archivo local (solo para desarrollo)
+    serviceAccount = require(path.resolve(__dirname, './conexion-agraria-firebase-adminsdk-ha2ts-793e939244.json'));
+  }
 
-// Inicializa Firebase Admin SDK
-admin.initializeApp({
-  credential: admin.credential.cert(firebaseCredentials),
-  databaseURL: "https://conexion-agraria-default-rtdb.firebaseio.com",
-  storageBucket: "conexion-agraria.appspot.com"
-});
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: "https://conexion-agraria-default-rtdb.firebaseio.com",
+    storageBucket: "conexion-agraria.appspot.com"
+  });
+
+  console.log('Firebase Admin SDK inicializado correctamente.');
+} catch (error) {
+  console.error('Error inicializando Firebase Admin SDK:', error.message);
+  process.exit(1); // Terminar la ejecución si no se inicializa Firebase
+}
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -20,52 +34,37 @@ const SECRET_KEY = 'supersecreta123';
 // Endpoint combinado
 app.get('/getCombinedData', async (req, res) => {
   try {
-    // Verificar la llave secreta
     const secretKey = req.query.secretKey || req.headers['x-secret-key'];
     if (!secretKey || secretKey !== SECRET_KEY) {
       return res.status(403).json({ error: 'Acceso denegado: llave secreta inválida.' });
     }
 
-    // Obtener datos de Properties
     const propertiesSnapshot = await admin.database().ref('Api/Properties').once('value');
     const properties = propertiesSnapshot.val();
 
-    if (!properties) {
-      throw new Error('No se encontraron propiedades en la base de datos.');
-    }
+    if (!properties) throw new Error('No se encontraron propiedades en la base de datos.');
 
-    // Obtener datos de Department
     const departmentSnapshot = await admin.database().ref('Api/Department').once('value');
     const departments = departmentSnapshot.val();
 
-    if (!departments) {
-      throw new Error('No se encontraron departamentos en la base de datos.');
-    }
+    if (!departments) throw new Error('No se encontraron departamentos en la base de datos.');
 
-    // Obtener datos de PropertiesStatus
     const statusSnapshot = await admin.database().ref('Api/PropertiesStatus').once('value');
     const statuses = statusSnapshot.val();
 
-    if (!statuses) {
-      throw new Error('No se encontraron estados de propiedades en la base de datos.');
-    }
+    if (!statuses) throw new Error('No se encontraron estados de propiedades en la base de datos.');
 
-    // Generar URLs de imágenes basadas en los nombres en el JSON de Properties
     const storageBaseUrl = "https://firebasestorage.googleapis.com/v0/b/conexion-agraria.appspot.com/o/predios%2F";
     const imagesBaseUrlSuffix = "?alt=media";
 
-    // Combinar datos
     const combinedData = Object.keys(properties).map(key => {
       const property = properties[key];
       const departmentNames = property.departamento.map(depId => departments[depId]?.nombre || 'Desconocido');
       const propertyImages = property.imagenes.map(image => image ? `${storageBaseUrl}${encodeURIComponent(image)}${imagesBaseUrlSuffix}` : null);
-
-      // Obtener el estado del predio
       const propertyStatus = statuses[property.estado_predio_id];
 
-      // Crear el objeto combinado con el campo ID y sin el campo estado_predio_id
       const combinedProperty = {
-        id: key, // Aquí se añade el ID de la propiedad
+        id: key,
         ...property,
         departamento: departmentNames,
         imagenes: propertyImages,
@@ -73,15 +72,11 @@ app.get('/getCombinedData', async (req, res) => {
         descripcion_estado: propertyStatus ? propertyStatus.descripcion : 'Descripción no disponible'
       };
 
-      // Eliminar el campo estado_predio_id
       delete combinedProperty.estado_predio_id;
-
       return combinedProperty;
     });
 
-    // Filtrar el campo "usuarios" antes de enviar la respuesta
     const filteredData = combinedData.map(({ usuarios, ...rest }) => rest);
-
     res.status(200).json(filteredData);
   } catch (error) {
     console.error('Error fetching data:', error.message);
@@ -89,4 +84,7 @@ app.get('/getCombinedData', async (req, res) => {
   }
 });
 
-module.exports = app; // Exportar la app completa
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Servidor escuchando en el puerto ${PORT}`);
+});
