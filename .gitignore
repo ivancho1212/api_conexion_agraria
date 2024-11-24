@@ -1,4 +1,2 @@
 node_modules/
 *.local
-# Ignorar claves de Firebase
-conexion-agraria-firebase-adminsdk-ha2ts-793e939244.json
