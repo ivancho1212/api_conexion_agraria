@@ -1,18 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const admin = require('firebase-admin');
-const path = require('path');
 
 // Inicialización de Firebase Admin SDK
 try {
-  let serviceAccount;
-  if (process.env.FIREBASE_CREDENTIALS) {
-    // Credenciales desde variables de entorno
-    serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
-  } else {
-    // Credenciales desde un archivo local (solo para desarrollo)
-    serviceAccount = require(path.resolve(__dirname, './conexion-agraria-firebase-adminsdk-ha2ts-793e939244.json'));
-  }
+  const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
 
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
